@@ -1,0 +1,133 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyNGKyZaOEUj7fb7cnrKPRep",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/rzangef21/spb-kelompok-2/blob/main/model\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "\n",
+        "# 1. Load dan Preprocessing Dasar\n",
+        "try:\n",
+        "    df = pd.read_csv('Dataset_indomaret_sales.csv')\n",
+        "    # Membersihkan data Units_Sold yang N/A seperti di screenshot sebelumnya\n",
+        "    df['Units_Sold'] = pd.to_numeric(df['Units_Sold'], errors='coerce')\n",
+        "    df['Units_Sold'] = df['Units_Sold'].fillna(df['Units_Sold'].median())\n",
+        "    df['Date'] = pd.to_datetime(df['Date'])\n",
+        "    df['Day'] = df['Date'].dt.day\n",
+        "    print(\"Dataset berhasil dimuat dan dibersihkan.\\n\")\n",
+        "except Exception as e:\n",
+        "    print(f\"Error: {e}\")\n",
+        "    exit()\n",
+        "\n",
+        "# 2. Fungsi Logika Certainty Factor\n",
+        "def hitung_cf_jawaban(evidence_status, mb_pakar, md_pakar=0.1):\n",
+        "    \"\"\"\n",
+        "    evidence_status: True jika data mendukung, False jika tidak\n",
+        "    mb_pakar: Measure of Belief (seberapa yakin pakar jika data benar)\n",
+        "    md_pakar: Measure of Disbelief (faktor ketidakyakinan)\n",
+        "    \"\"\"\n",
+        "    if evidence_status:\n",
+        "        cf = (mb_pakar - md_pakar)\n",
+        "    else:\n",
+        "        # Jika fakta lapangan salah, nilai kepastian menjadi negatif\n",
+        "        cf = (0 - mb_pakar)\n",
+        "    return round(cf, 3)\n",
+        "\n",
+        "# --- ANALISIS DATA UNTUK EVIDENCE ---\n",
+        "\n",
+        "# Fakta 1: Tren Penjualan Harian\n",
+        "daily_sales = df.groupby('Date')['Total_Revenue'].sum()\n",
+        "# Cek apakah hari terakhir lebih tinggi dari rata-rata hari sebelumnya\n",
+        "tren_naik = daily_sales.iloc[-1] > daily_sales.mean()\n",
+        "\n",
+        "# Fakta 2: Penjualan Tanggal 3\n",
+        "sales_per_day = df.groupby('Day')['Total_Revenue'].sum()\n",
+        "is_tgl_3_max = sales_per_day.idxmax() == 3\n",
+        "\n",
+        "# Fakta 3: Jakarta Terendah\n",
+        "store_perf = df.groupby('Store_Location')['Total_Revenue'].sum()\n",
+        "is_jakarta_min = store_perf.idxmin() == 'Jakarta'\n",
+        "\n",
+        "# --- OUTPUT DENGAN METODE CF ---\n",
+        "\n",
+        "print(\"=== HASIL ANALISIS CERTAINTY FACTOR ===\\n\")\n",
+        "\n",
+        "# Jawaban 1\n",
+        "cf_1 = hitung_cf_jawaban(tren_naik, 0.8)\n",
+        "status_1 = \"Naik\" if cf_1 > 0 else \"Tidak Naik/Turun\"\n",
+        "print(f\"1. Apakah tren harian naik? \\n   Status: {status_1} (CF: {cf_1})\")\n",
+        "\n",
+        "# Jawaban 2\n",
+        "cf_2 = hitung_cf_jawaban(is_tgl_3_max, 0.9)\n",
+        "status_2 = \"Ya\" if cf_2 > 0 else \"Tidak\"\n",
+        "print(f\"2. Apakah tanggal 3 tertinggi? \\n   Status: {status_2} (CF: {cf_2})\")\n",
+        "\n",
+        "# Jawaban 3\n",
+        "cf_3 = hitung_cf_jawaban(is_jakarta_min, 0.85)\n",
+        "status_3 = \"Ya\" if cf_3 > 0 else \"Tidak\"\n",
+        "print(f\"3. Apakah Jakarta terendah? \\n   Status: {status_3} (CF: {cf_3})\")\n",
+        "\n",
+        "# Penjelasan Tambahan untuk Bukti\n",
+        "print(\"\\n--- Bukti Data ---\")\n",
+        "print(f\"- Penjualan Tertinggi ada pada Tanggal: {sales_per_day.idxmax()}\")\n",
+        "print(f\"- Lokasi Penjualan Terendah: {store_perf.idxmin()}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "pbuk__8B1pLP",
+        "outputId": "a9264c34-9df2-4faa-e1fa-b473be16d0e6"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Dataset berhasil dimuat dan dibersihkan.\n",
+            "\n",
+            "=== HASIL ANALISIS CERTAINTY FACTOR ===\n",
+            "\n",
+            "1. Apakah tren harian naik? \n",
+            "   Status: Naik (CF: 0.7)\n",
+            "2. Apakah tanggal 3 tertinggi? \n",
+            "   Status: Tidak (CF: -0.9)\n",
+            "3. Apakah Jakarta terendah? \n",
+            "   Status: Tidak (CF: -0.85)\n",
+            "\n",
+            "--- Bukti Data ---\n",
+            "- Penjualan Tertinggi ada pada Tanggal: 6\n",
+            "- Lokasi Penjualan Terendah: Bandung\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
